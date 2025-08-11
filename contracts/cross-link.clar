@@ -93,3 +93,101 @@
   principal
   uint
 )
+
+;; PUBLIC FUNCTIONS - ADMINISTRATION
+
+;; Initialize the CrossLink Protocol bridge system
+;; Only the contract deployer can activate the bridge
+(define-public (initialize-bridge)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-DEPLOYER) (err ERROR-NOT-AUTHORIZED))
+    (var-set bridge-paused false)
+    (ok true)
+  )
+)
+
+;; Emergency pause mechanism for bridge operations
+;; Immediately halts all bridge activities for security
+(define-public (pause-bridge)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-DEPLOYER) (err ERROR-NOT-AUTHORIZED))
+    (var-set bridge-paused true)
+    (ok true)
+  )
+)
+
+;; Resume bridge operations after security review
+;; Reactivates the bridge from paused state
+(define-public (resume-bridge)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-DEPLOYER) (err ERROR-NOT-AUTHORIZED))
+    (asserts! (var-get bridge-paused) (err ERROR-INVALID-BRIDGE-STATUS))
+    (var-set bridge-paused false)
+    (ok true)
+  )
+)
+
+;; PUBLIC FUNCTIONS - VALIDATOR MANAGEMENT
+
+;; Register a new validator in the CrossLink network
+;; Expands the decentralized validator consensus
+(define-public (add-validator (validator principal))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-DEPLOYER) (err ERROR-NOT-AUTHORIZED))
+    (asserts! (is-valid-principal validator)
+      (err ERROR-INVALID-VALIDATOR-ADDRESS)
+    )
+    (map-set validators validator true)
+    (ok true)
+  )
+)
+
+;; Remove a validator from the CrossLink network
+;; Maintains network integrity by removing compromised validators
+(define-public (remove-validator (validator principal))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-DEPLOYER) (err ERROR-NOT-AUTHORIZED))
+    (asserts! (is-valid-principal validator)
+      (err ERROR-INVALID-VALIDATOR-ADDRESS)
+    )
+    (map-set validators validator false)
+    (ok true)
+  )
+)
+
+;; PUBLIC FUNCTIONS - BRIDGE OPERATIONS
+
+;; Initiate a cross-chain deposit from Bitcoin to Stacks
+;; Validators detect Bitcoin transactions and propose deposits
+(define-public (initiate-deposit
+    (tx-hash (buff 32))
+    (amount uint)
+    (recipient principal)
+    (btc-sender (buff 33))
+  )
+  (begin
+    (asserts! (not (var-get bridge-paused)) (err ERROR-BRIDGE-PAUSED))
+    (asserts! (validate-deposit-amount amount) (err ERROR-INVALID-AMOUNT))
+    (asserts! (get-validator-status tx-sender) (err ERROR-NOT-AUTHORIZED))
+    (asserts! (is-valid-tx-hash tx-hash) (err ERROR-INVALID-TX-HASH))
+    (asserts! (is-none (map-get? deposits { tx-hash: tx-hash }))
+      (err ERROR-ALREADY-PROCESSED)
+    )
+    (asserts! (is-valid-principal recipient)
+      (err ERROR-INVALID-RECIPIENT-ADDRESS)
+    )
+    (asserts! (is-valid-btc-address btc-sender) (err ERROR-INVALID-BTC-ADDRESS))
+
+    (let ((validated-deposit {
+        amount: amount,
+        recipient: recipient,
+        processed: false,
+        confirmations: u0,
+        timestamp: stacks-block-height,
+        btc-sender: btc-sender,
+      }))
+      (map-set deposits { tx-hash: tx-hash } validated-deposit)
+      (ok true)
+    )
+  )
+)
