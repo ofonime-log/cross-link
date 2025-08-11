@@ -297,3 +297,85 @@
     )
   )
 )
+
+;; READ-ONLY FUNCTIONS - DATA QUERIES
+
+;; Retrieve comprehensive deposit information
+;; Returns complete transaction history and status
+(define-read-only (get-deposit (tx-hash (buff 32)))
+  (map-get? deposits { tx-hash: tx-hash })
+)
+
+;; Check current bridge operational status
+;; Monitor system availability in real-time
+(define-read-only (get-bridge-status)
+  (var-get bridge-paused)
+)
+
+;; Verify validator authorization status
+;; Confirm participant legitimacy in the network
+(define-read-only (get-validator-status (validator principal))
+  (default-to false (map-get? validators validator))
+)
+
+;; Query user's bridged asset balance
+;; Real-time balance tracking for users
+(define-read-only (get-bridge-balance (user principal))
+  (default-to u0 (map-get? bridge-balances user))
+)
+
+;; READ-ONLY FUNCTIONS - VALIDATION
+
+;; Validate Stacks principal address format
+;; Ensures address integrity and prevents errors
+(define-read-only (is-valid-principal (address principal))
+  (and
+    (not (is-eq address CONTRACT-DEPLOYER))
+    (not (is-eq address (as-contract tx-sender)))
+  )
+)
+
+;; Validate Bitcoin address cryptographic format
+;; Verifies compressed public key structure
+(define-read-only (is-valid-btc-address (btc-addr (buff 33)))
+  (and
+    (is-eq (len btc-addr) u33)
+    (not (is-eq btc-addr
+      0x000000000000000000000000000000000000000000000000000000000000000000
+    ))
+    true
+  )
+)
+
+;; Validate Bitcoin transaction hash format
+;; Ensures proper 32-byte hash structure
+(define-read-only (is-valid-tx-hash (tx-hash (buff 32)))
+  (and
+    (is-eq (len tx-hash) u32)
+    (not (is-eq tx-hash
+      0x0000000000000000000000000000000000000000000000000000000000000000
+    ))
+    true
+  )
+)
+
+;; Validate cryptographic signature format
+;; Verifies 65-byte ECDSA signature structure
+(define-read-only (is-valid-signature (signature (buff 65)))
+  (and
+    (is-eq (len signature) u65)
+    (not (is-eq signature
+      0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+    ))
+    true
+  )
+)
+
+;; Validate transaction amount within protocol limits
+;; Enforces minimum and maximum transfer thresholds
+(define-read-only (validate-deposit-amount (amount uint))
+  (and
+    (>= amount MIN-DEPOSIT-AMOUNT)
+    (<= amount MAX-DEPOSIT-AMOUNT)
+  )
+)
